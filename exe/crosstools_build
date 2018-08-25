@@ -1,0 +1,51 @@
+#!ruby
+
+require 'crosstools_builder'
+require 'optparse'
+
+$build = nil
+$from = nil
+$download_only = nil
+
+CrosstoolsBuilder::Command.verbose = true
+OptionParser.new do |opt|
+  opt.on("--build=LIST", "Comma separate list to build") do |x|
+    $build = x.split(",")
+  end
+
+  opt.on("--short-circuit=FROM", "Build from specfied build step") do |x|
+    $from = x
+  end
+
+  opt.on("--download-only", "Download sources") do |x|
+    $download_only = x
+  end
+
+  opt.on("--dryrun", "Only print commands") do |x|
+    CrossBuilder::Command.dryrun = x
+  end
+
+  opt.on("--verbose", "Print commands") do |x|
+    CrossBuilder::Command.verbose = x
+  end
+
+  opt.on("--quiet", "Do not print commands") do |x|
+    CrossBuilder::Command.verbose = !x
+  end
+end.parse!
+ARGV.each do |f|
+  app = CrosstoolsBuilder.load(f)
+  if $download_only
+    app.create_dirs
+    app.download_sources
+  elsif $build
+    list = $build.map do |x|
+      app.builds.find_if { |b| b[:name] == x }
+    end
+    app.build(list)
+  elsif $from
+    app.build_from($from)
+  else
+    app.build_all
+  end
+end
