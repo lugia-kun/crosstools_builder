@@ -398,6 +398,22 @@ module CrosstoolsBuilder
         @__pipe_list.clear
         stat
       end
+
+      def chdir(path, &block)
+        Command.chdir(path, &block)
+      end
+
+      def cd(path)
+        Command.chdir(path)
+      end
+
+      def chroot(path)
+        Command.chroot(path)
+      end
+
+      def run(*args)
+        @__pipe_list << Command::Process.new(*args)
+      end
     end
 
     def self.shell(obj, &block)

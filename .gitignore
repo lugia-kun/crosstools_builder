@@ -8,5 +8,6 @@
 /tmp/
 /vendor/
 
+/.ruby-version
 
 *~

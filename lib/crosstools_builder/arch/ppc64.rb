@@ -1,9 +1,9 @@
 
 require 'crosstools_builder/arch'
 
-CrosstoolsBuilder::Architecture.define :Sparc64 do
-  arch   "sparc64"
-  triple "sparc64-suse-linux-gnu"
+CrosstoolsBuilder::Architecture.define :PowerPC64 do
+  arch   "ppc64"
+  triple "ppc64-suse-linux-gnu"
   source "binutils",
          "ftp://ftp.gnu.org/pub/gnu/binutils/binutils-2.31.tar.xz",
          sha512: "3448a71c42d790569c1159c1042aa520b2d8ac8af7506fb1f2a4199dfb13b39f1c2271a5cb3a643d10c7d8a388a73f190e90503d4793a016da7893473aa1c635"
@@ -91,9 +91,9 @@ CrosstoolsBuilder::Architecture.define :Sparc64 do
       shell do
         make "clean"
         make "mrproper"
-        make "ARCH=#{@arch}", "defconfig"
-        make "ARCH=#{@arch}", "headers_check"
-        make "ARCH=#{@arch}", "INSTALL_HDR_PATH=#{dir}", "headers_install"
+        make "ARCH=powerpc", "ppc64_defconfig"
+        make "ARCH=powerpc", "headers_check"
+        make "ARCH=powerpc", "INSTALL_HDR_PATH=#{dir}", "headers_install"
       end
     end
 
@@ -102,9 +102,21 @@ CrosstoolsBuilder::Architecture.define :Sparc64 do
         rm "-rf", "build-headers"
         mkdir "build-headers"
         chdir "build-headers" do
+          r, w = IO.pipe
+          pipe do
+            run "cat", in: r, out: "config.cache"
+            w.print <<-EOF
+libc_cv_mlong_double_128=yes
+libc_cv_mlong_double_128ibm=yes
+libc_cv_ppc64_elfv2_abi=yes
+          EOF
+            w.close
+          end
+          r.close
           run "../configure",
               "--prefix=#{@rootdir}",
-              "--host=#{@triple}",
+              "--host=#{triple}",
+              "--config-cache",
               "--includedir=#{@rootdir}/usr/include",
               "--with-headers=#{@rootdir}/usr/include"
           make "-k", "cross_compiling=yes", "install-headers"
@@ -142,11 +154,13 @@ CrosstoolsBuilder::Architecture.define :Sparc64 do
             "--disable-libssp",
             "--disable-libstdcxx",
             "--disable-libatomic",
+            "--disable-libmudflap",
             "--disable-nls",
             "--disable-shared",
             "--disable-multilib",
             "--disable-cloog",
-            "--disable-libgomp"
+            "--disable-libgomp",
+            "--with-cpu=power9"
         @macros.call "make"
         make "install"
       end
@@ -181,7 +195,8 @@ CrosstoolsBuilder::Architecture.define :Sparc64 do
             "--target=#{@triple}",
             "--with-sysroot=#{@rootdir}",
             "--enable-languages=c,c++,fortran,objc",
-            "--disable-multilib"
+            "--disable-multilib",
+            "--with-cpupower9"
         @macros.call "make"
         make "install"
       end
@@ -233,7 +248,8 @@ CrosstoolsBuilder::Architecture.define :Sparc64 do
               "--host=#{@triple}",
               "--target=#{@triple}",
               "--disable-bootstrap",
-              "--disable-multilib"
+              "--disable-multilib",
+              "--with-cpu=power9"
           @macros.call "make"
           make "install", "DESTDIR=#{@rootdir}"
         end
@@ -299,15 +315,15 @@ int main()
 }
 EOF
       source.close
-      p Dir.pwd
       shell do
         chdir(@rootdir)
-        run "qemu-sparc64", "-L", "#{@rootdir}",
+        run "qemu-ppc64", "-L", "#{@rootdir}",
             File.join(@rootdir, "bin/pwd")
-        run "qemu-sparc64", "-L", "#{@rootdir}",
+        run "qemu-ppc64", "-L", "#{@rootdir}",
             File.join(@rootdir, "bin/ls"), "/usr"
         run "#{@triple}-gcc", "-Wl,-rpath-link,#{@rootdir}/lib64", "-fopenmp", "-o", execut.path, source.path
-        run "qemu-sparc64", "-L", "#{@rootdir}", execut.path
+        run({"LD_LIBRARY_PATH" => "/usr/lib:/lib"}, "qemu-ppc64", "-L", "#{@rootdir}", execut.path)
+        file execut.path
       end
     end
 

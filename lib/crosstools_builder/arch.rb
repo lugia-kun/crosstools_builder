@@ -12,7 +12,6 @@ module CrosstoolsBuilder
         @macros = {}
         @builds = []
         @sources = {}
-        @src = {}
 
         def mod.arch
           @arch
@@ -29,9 +28,6 @@ module CrosstoolsBuilder
         def mod.sources
           @sources
         end
-        def mod.src
-          @src
-        end
       end
       set = Module.new do |m|
         m.define_method(:set_arch) do |x|
@@ -42,7 +38,6 @@ module CrosstoolsBuilder
         end
         m.define_method(:add_source) do |name, x|
           mod.instance_variable_get(:@sources)[name] = x
-          mod.instance_variable_get(:@src)[name] = x[:dir]
         end
         m.define_method(:add_macro) do |name, x|
           mod.instance_variable_get(:@macros)[name] = x
@@ -57,7 +52,7 @@ module CrosstoolsBuilder
       cls.instance_eval(&block)
       const_set(sym, mod)
       @@defined_archs ||= {}
-      @@defined_archs[cls.instance_variable_get(:@arch)] = cls
+      @@defined_archs[mod.instance_variable_get(:@arch)] = mod
     end
 
     def self.defined_archs

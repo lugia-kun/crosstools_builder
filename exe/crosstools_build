@@ -1,38 +1,70 @@
 #!ruby
 
 require 'crosstools_builder'
-require 'optparse'
-
-$build = nil
-$from = nil
-$download_only = nil
+require 'thor'
 
 CrosstoolsBuilder::Command.verbose = true
-OptionParser.new do |opt|
-  opt.on("--build=LIST", "Comma separate list to build") do |x|
-    $build = x.split(",")
+
+class CrosstoolsBuilder::CLI < Thor
+  include CrosstoolsBuilder
+
+  class ArchNotFound < RuntimeError
   end
 
-  opt.on("--short-circuit=FROM", "Build from specfied build step") do |x|
-    $from = x
-  end
+  long_desc <<-LONGDESC
+    Build toolchains for given architecture ARCH.
 
-  opt.on("--download-only", "Download sources") do |x|
-    $download_only = x
-  end
+    If a file named ARCH.rb exists on the current directory, we load
+    it to get build rule for achitecture ARCH. Otherwise, predefined
+    build rule used.
 
-  opt.on("--dryrun", "Only print commands") do |x|
-    CrossBuilder::Command.dryrun = x
-  end
+  LONGDESC
+  option :dryrun, desc: "Do not run actual command", type: :boolean, aliases: ["-d"]
+  option :rootdir, desc: "root directory of linux userland", type: :string, default: nil
+  option :builddir, desc: "build directory", type: :string, default: nil
+  option :toolsdir, desc: "install directory", type: :string, default: nil
+  option :nproc, desc: "Number of jobs for parallel build", aliases: ["-j"], type: :numeric
+  option :from, desc: "Build from specfied step", default: nil
+  option :"download-only", desc: "Only download sources", type: :boolean
+  option :without, desc: "Skip specific step (comma separated)"
+  desc "build ARCH", "Build toolchain"
+  def build(arch)
+    if File.exist?(arch + ".rb")
+      load arch + ".rb"
+    else
+      begin
+        require "crosstools_builder/arch/#{arch}"
+      rescue LoadError
+        raise ArchNotFound, "Arch #{arch} not defined (yet)"
+      end
+    end
+    rule_def = Architecture.defined_archs[arch]
+    fail ArchNotFound, "Arch #{arch} not provided by source" unless rule_def
 
-  opt.on("--verbose", "Print commands") do |x|
-    CrossBuilder::Command.verbose = x
+    Command.dryrun = !!options[:dryrun]
+    app = Builder.new(rule_def, nproc: options[:nproc],
+                      rootdir: options[:rootdir], builddir: options[:builddir],
+                      toolsdir: options[:toolsdir])
+    if options[:from]
+      from = options[:from]
+      list = app.builds
+      if from == "" || from == "?" || !list.any? { |x| x[:name] == from }
+        $stdout.puts "--- # Build list for #{arch}."
+        app.builds.each do |o|
+          $stdout.puts "- #{o[:name]}"
+        end
+        return
+      end
+      app.build_from(from)
+      return
+    end
+    app.build_all
   end
+end
 
-  opt.on("--quiet", "Do not print commands") do |x|
-    CrossBuilder::Command.verbose = !x
-  end
-end.parse!
+CrosstoolsBuilder::CLI.start(ARGV)
+
+__END__
 ARGV.each do |f|
   app = CrosstoolsBuilder.load(f)
   if $download_only
