@@ -1,9 +1,9 @@
 
 require 'crosstools_builder/arch'
 
-CrosstoolsBuilder::Architecture.define :Sparc64 do
-  arch   "sparc64"
-  triple "sparc64-suse-linux-gnu"
+CrosstoolsBuilder::Architecture.define :Aarch64 do
+  arch   "aarch64"
+  triple "aarch64-suse-linux-gnueabi"
   source "binutils",
          "ftp://ftp.gnu.org/pub/gnu/binutils/binutils-2.31.tar.xz",
          sha512: "3448a71c42d790569c1159c1042aa520b2d8ac8af7506fb1f2a4199dfb13b39f1c2271a5cb3a643d10c7d8a388a73f190e90503d4793a016da7893473aa1c635"
@@ -91,9 +91,9 @@ CrosstoolsBuilder::Architecture.define :Sparc64 do
       shell do
         make "clean"
         make "mrproper"
-        make "ARCH=#{@arch}", "sparc64_defconfig"
-        make "ARCH=#{@arch}", "headers_check"
-        make "ARCH=#{@arch}", "INSTALL_HDR_PATH=#{dir}", "headers_install"
+        make "ARCH=arm64", "defconfig"
+        make "ARCH=arm64", "headers_check"
+        make "ARCH=arm64", "INSTALL_HDR_PATH=#{dir}", "headers_install"
       end
     end
 
@@ -299,15 +299,14 @@ int main()
 }
 EOF
       source.close
-      p Dir.pwd
       shell do
         chdir(@rootdir)
-        run "qemu-sparc64", "-L", "#{@rootdir}",
+        run "qemu-arm", "-L", "#{@rootdir}",
             File.join(@rootdir, "bin/pwd")
-        run "qemu-sparc64", "-L", "#{@rootdir}",
+        run "qemu-arm", "-L", "#{@rootdir}",
             File.join(@rootdir, "bin/ls"), "/usr"
-        run "#{@triple}-gcc", "-Wl,-rpath-link,#{@rootdir}/lib64", "-fopenmp", "-o", execut.path, source.path
-        run "qemu-sparc64", "-L", "#{@rootdir}", execut.path
+        run "#{@triple}-gcc", "-Wl,-rpath-link,#{@rootdir}/usr/lib", "-fopenmp", "-o", execut.path, source.path
+        run "qemu-arm", "-L", "#{@rootdir}", execut.path
       end
     end
 
